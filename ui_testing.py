@@ -29,6 +29,7 @@ class TestDialogue(QtWidgets.QDialog):
         self.default_rb = QtWidgets.QRadioButton("default")
 
         self.prntConst_rb = QtWidgets.QRadioButton("Parent")
+        self.prntConst_rb.setChecked(True)
         self.pntConst_rb = QtWidgets.QRadioButton("Point")
         self.orntConst_rb = QtWidgets.QRadioButton("Orient")
         self.scaleConst_rb = QtWidgets.QRadioButton("Scale")
