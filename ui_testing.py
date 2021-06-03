@@ -92,7 +92,7 @@ class TestDialogue(QtWidgets.QDialog):
         # arrange layouts
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.addLayout(form_layout_const)
-        main_layout.addLayout(box_layout_type)
+        main_layout.addLayout(box_transform)
         main_layout.addLayout(box_layout_axis)
         main_layout.addLayout(box_layout_type)
         main_layout.addLayout(box_layout_button)
