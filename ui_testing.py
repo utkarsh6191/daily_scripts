@@ -115,53 +115,66 @@ class TestDialogue(QtWidgets.QDialog):
         source = sel[0]
         target = sel[1]
 
+        axes_type = ["x", "y", "z"]
+        skipped_axes = []
+
+        if self.axisX_cb.isChecked() and self.axisY_cb.isChecked() and self.axisZ_cb.isChecked():
+            # constrains all axes
+            skipped_axes = ["none"]
+
+        elif self.axisX_cb.isChecked():
+            # skips yz
+            skipped_axes = [e for e in axes_type if e not in 'x']
+        elif self.axisY_cb.isChecked():
+            # skips xz
+            skipped_axes = [e for e in axes_type if e not in 'y']
+        elif self.axisZ_cb.isChecked():
+            # skips xy
+            skipped_axes = [e for e in axes_type if e not in 'z']
+
+        elif self.axisX_cb.isChecked() and self.axisY_cb.isChecked():
+            # skips z
+            skipped_axes = [e for e in axes_type if e not in ('x', 'y')]
+        elif self.axisY_cb.isChecked() and self.axisZ_cb.isChecked():
+            # skips x
+            skipped_axes = [e for e in axes_type if e not in ('y', 'z')]
+        elif self.axisZ_cb.isChecked() and self.axisX_cb.isChecked():
+            # skips y
+            skipped_axes = [e for e in axes_type if e not in ('x', 'z')]
+
         if self.prntConst_rb.isChecked():
-            self.create_parent_constraint(source, target)
-
+            self.create_parent_constraint(source, target, skipped_axes)
         elif self.pntConst_rb.isChecked():
-            self.create_point_constraint(source, target)
+            self.create_point_constraint(source, target, skipped_axes)
         elif self.orntConst_rb.isChecked():
-            self.create_orient_constraint(source, target)
+            self.create_orient_constraint(source, target, skipped_axes)
         else:
-            self.create_scale_constraint(source, target)
+            self.create_scale_constraint(source, target, skipped_axes)
 
-    def create_parent_constraint(self, source, target):
+    def create_parent_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
-            pm.parentConstraint(source, target, mo=1)
-        else:
-            pm.parentConstraint(source, target, mo=0)
 
-    def create_point_constraint(self, source, target):
+            pm.parentConstraint(source, target, st=skipped_axes, sr=skipped_axes, mo=1)
+        else:
+            pm.parentConstraint(source, target, st=skipped_axes, sr=skipped_axes, mo=0)
+
+    def create_point_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
-            pm.pointConstraint(source, target, mo=1)
+            pm.pointConstraint(source, target, sk=skipped_axes, mo=1)
         else:
-            pm.pointConstraint(source, target, mo=0)
+            pm.pointConstraint(source, target, sk=skipped_axes, mo=0)
 
-    def create_orient_constraint(self, source, target):
+    def create_orient_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
-            pm.orientConstraint(source, target, mo=1)
+            pm.orientConstraint(source, target, sk=skipped_axes, mo=1)
         else:
-            pm.orientConstraint(source, target, mo=0)
+            pm.orientConstraint(source, target, sk=skipped_axes, mo=0)
 
-    def create_scale_constraint(self, source, target):
+    def create_scale_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
-            pm.scaleConstraint(source, target, mo=1)
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=1)
         else:
-            pm.scaleConstraint(source, target, mo=0)
-
-
-        """parentConstraint -mo -weight 1;
-
-        parentConstraint -weight 1;
-
-        parentConstraint -skipTranslate x -skipTranslate y -skipTranslate z -weight 1;
-
-        parentConstraint -skipRotate x -skipRotate y -skipRotate z -weight 1;
-
-        parentConstraint -skipTranslate y -skipTranslate z -skipRotate y -skipRotate z -weight 1;
-
-        doCreateParentConstraintArgList 1 { "0","0","0","1","1","0","1","1","1","","1" };
-        parentConstraint -skipTranslate y -skipTranslate z -skipRotate y -skipRotate z -weight 1;"""
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=0)
 
 
 if __name__ == "__main__":
