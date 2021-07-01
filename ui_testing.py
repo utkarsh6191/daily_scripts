@@ -33,9 +33,21 @@ class TestDialogue(QtWidgets.QDialog):
         self.prntConst_rb.setIcon(QtGui.QIcon(":parentConstraint.png"))
         self.prntConst_rb.setChecked(True)
         self.translate_cb = QtWidgets.QCheckBox("Translate")
-        self.prntConst_rb.setChecked(True)
+        self.translate_cb.setChecked(True)
+        self.translateX_cb = QtWidgets.QCheckBox("X")
+        self.translateX_cb.setChecked(True)
+        self.translateY_cb = QtWidgets.QCheckBox("Y")
+        self.translateY_cb.setChecked(True)
+        self.translateZ_cb = QtWidgets.QCheckBox("Z")
+        self.translateZ_cb.setChecked(True)
         self.rotate_cb = QtWidgets.QCheckBox("Rotate")
-        self.prntConst_rb.setChecked(True)
+        self.rotate_cb.setChecked(True)
+        self.rotateX_cb = QtWidgets.QCheckBox("X")
+        self.rotateX_cb.setChecked(True)
+        self.rotateY_cb = QtWidgets.QCheckBox("Y")
+        self.rotateY_cb.setChecked(True)
+        self.rotateZ_cb = QtWidgets.QCheckBox("Z")
+        self.rotateZ_cb.setChecked(True)
 
         self.pntConst_rb = QtWidgets.QRadioButton("Point")
         self.pntConst_rb.setIcon(QtGui.QIcon(":posConstraint.png"))
@@ -62,6 +74,7 @@ class TestDialogue(QtWidgets.QDialog):
         # layout for constraint type
         form_layout_const = QtWidgets.QGridLayout()
         form_layout_const.addWidget(self.prntConst_rb, 1, 1)
+        form_layout_const.alignment()
         form_layout_const.addWidget(self.pntConst_rb, 1, 2)
         form_layout_const.addWidget(self.orntConst_rb, 2, 1)
         form_layout_const.addWidget(self.scaleConst_rb, 2, 2)
@@ -72,9 +85,18 @@ class TestDialogue(QtWidgets.QDialog):
         box_layout_type.addWidget(self.matrix_rb)
 
         # layout for translate checkbox
-        box_transform = QtWidgets.QHBoxLayout()
-        box_transform.addWidget(self.translate_cb)
-        box_transform.addWidget(self.rotate_cb)
+        box_translate = QtWidgets.QHBoxLayout()
+        box_translate.addWidget(self.translate_cb)
+        box_translate.addWidget(self.translateX_cb)
+        box_translate.addWidget(self.translateY_cb)
+        box_translate.addWidget(self.translateZ_cb)
+
+        # layout for rotate checkbox
+        box_rotate = QtWidgets.QHBoxLayout()
+        box_rotate.addWidget(self.rotate_cb)
+        box_rotate.addWidget(self.rotateX_cb)
+        box_rotate.addWidget(self.rotateY_cb)
+        box_rotate.addWidget(self.rotateZ_cb)
 
         # layout for constraint method
         box_layout_axis = QtWidgets.QHBoxLayout()
@@ -92,7 +114,8 @@ class TestDialogue(QtWidgets.QDialog):
         # arrange layouts
         main_layout = QtWidgets.QVBoxLayout(self)
         main_layout.addLayout(form_layout_const)
-        main_layout.addLayout(box_transform)
+        main_layout.addLayout(box_translate)
+        main_layout.addLayout(box_rotate)
         main_layout.addLayout(box_layout_axis)
         main_layout.addLayout(box_layout_type)
         main_layout.addLayout(box_layout_button)
@@ -105,9 +128,15 @@ class TestDialogue(QtWidgets.QDialog):
 
     def update_force_visibility_translate(self, checked):
         self.translate_cb.setVisible(checked)
+        self.translateX_cb.setVisible(checked)
+        self.translateY_cb.setVisible(checked)
+        self.translateZ_cb.setVisible(checked)
 
     def update_force_visibility_rotate(self, checked):
         self.rotate_cb.setVisible(checked)
+        self.rotateX_cb.setVisible(checked)
+        self.rotateY_cb.setVisible(checked)
+        self.rotateZ_cb.setVisible(checked)
 
     def create_constraint(self):
 
@@ -115,48 +144,144 @@ class TestDialogue(QtWidgets.QDialog):
         source = sel[0]
         target = sel[1]
 
+        if self.prntConst_rb.isChecked():
+            skipped_axes_translate, skipped_axes_rotate = self.check_parentConstraint_axes()
+
+            self.create_parent_constraint(source, target, skipped_axes_translate, skipped_axes_rotate)
+        elif self.pntConst_rb.isChecked():
+            skipped_axes = self.check_axes()
+            self.create_point_constraint(source, target, skipped_axes)
+        elif self.orntConst_rb.isChecked():
+            skipped_axes = self.check_axes()
+            self.create_orient_constraint(source, target, skipped_axes)
+        else:
+            skipped_axes = self.check_axes()
+            self.create_scale_constraint(source, target, skipped_axes)
+
+    def check_axes(self):
         axes_type = ["x", "y", "z"]
         skipped_axes = []
 
-        if self.axisX_cb.isChecked() and self.axisY_cb.isChecked() and self.axisZ_cb.isChecked():
-            # constrains all axes
-            skipped_axes = ["none"]
-
-        elif self.axisX_cb.isChecked():
+        if self.axisX_cb.isChecked():
             # skips yz
             skipped_axes = [e for e in axes_type if e not in 'x']
-        elif self.axisY_cb.isChecked():
+            print(skipped_axes)
+
+        if self.axisY_cb.isChecked():
             # skips xz
             skipped_axes = [e for e in axes_type if e not in 'y']
-        elif self.axisZ_cb.isChecked():
+            print(skipped_axes)
+
+        if self.axisZ_cb.isChecked():
             # skips xy
             skipped_axes = [e for e in axes_type if e not in 'z']
+            print(skipped_axes)
 
-        elif self.axisX_cb.isChecked() and self.axisY_cb.isChecked():
+        if self.axisX_cb.isChecked() and self.axisY_cb.isChecked():
             # skips z
             skipped_axes = [e for e in axes_type if e not in ('x', 'y')]
-        elif self.axisY_cb.isChecked() and self.axisZ_cb.isChecked():
+            print(skipped_axes)
+        if self.axisY_cb.isChecked() and self.axisZ_cb.isChecked():
             # skips x
             skipped_axes = [e for e in axes_type if e not in ('y', 'z')]
-        elif self.axisZ_cb.isChecked() and self.axisX_cb.isChecked():
+            print(skipped_axes)
+        if self.axisZ_cb.isChecked() and self.axisX_cb.isChecked():
             # skips y
             skipped_axes = [e for e in axes_type if e not in ('x', 'z')]
+            print(skipped_axes)
 
-        if self.prntConst_rb.isChecked():
-            self.create_parent_constraint(source, target, skipped_axes)
-        elif self.pntConst_rb.isChecked():
-            self.create_point_constraint(source, target, skipped_axes)
-        elif self.orntConst_rb.isChecked():
-            self.create_orient_constraint(source, target, skipped_axes)
+        if self.axisX_cb.isChecked() and self.axisY_cb.isChecked() and self.axisZ_cb.isChecked():
+            # skips y
+            skipped_axes = "none"
+            print(skipped_axes)
+        return skipped_axes
+
+    def check_parentConstraint_axes(self):
+
+        axes_type = ["x", "y", "z"]
+        skipped_axes = []
+        skipped_axes_translate = []
+        skipped_axes_rotate = []
+
+        if self.translate_cb.isChecked():
+            if self.translateX_cb.isChecked():
+                # skips yz
+                skipped_axes_translate = [e for e in axes_type if e not in 'x']
+                print(skipped_axes_translate)
+
+            if self.translateY_cb.isChecked():
+                # skips xz
+                skipped_axes_translate = [e for e in axes_type if e not in 'y']
+                print(skipped_axes_translate)
+
+            if self.translateZ_cb.isChecked():
+                # skips xy
+                skipped_axes_translate = [e for e in axes_type if e not in 'z']
+                print(skipped_axes_translate)
+
+            if self.translateX_cb.isChecked() and self.translateY_cb.isChecked():
+                # skips z
+                skipped_axes_translate = [e for e in axes_type if e not in ('x', 'y')]
+                print(skipped_axes_translate)
+            if self.translateY_cb.isChecked() and self.translateZ_cb.isChecked():
+                # skips x
+                skipped_axes_translate = [e for e in axes_type if e not in ('y', 'z')]
+                print(skipped_axes_translate)
+            if self.translateZ_cb.isChecked() and self.translateX_cb.isChecked():
+                # skips y
+                skipped_axes_translate = [e for e in axes_type if e not in ('x', 'z')]
+                print(skipped_axes_translate)
+
+            if self.translateX_cb.isChecked() and self.translateY_cb.isChecked() and self.translateZ_cb.isChecked():
+                # skips y
+                skipped_axes_translate = "none"
+                print(skipped_axes_translate)
         else:
-            self.create_scale_constraint(source, target, skipped_axes)
+            skipped_axes_translate = axes_type
+        if self.rotate_cb.isChecked():
+            if self.translateX_cb.isChecked():
+                # skips yz
+                skipped_axes_rotate = [e for e in axes_type if e not in 'x']
+                print(skipped_axes_rotate)
 
-    def create_parent_constraint(self, source, target, skipped_axes):
+            if self.translateY_cb.isChecked():
+                # skips xz
+                skipped_axes_rotate = [e for e in axes_type if e not in 'y']
+                print(skipped_axes_rotate)
+
+            if self.translateZ_cb.isChecked():
+                # skips xy
+                skipped_axes_rotate = [e for e in axes_type if e not in 'z']
+                print(skipped_axes_rotate)
+
+            if self.translateX_cb.isChecked() and self.translateY_cb.isChecked():
+                # skips z
+                skipped_axes_rotate = [e for e in axes_type if e not in ('x', 'y')]
+                print(skipped_axes_rotate)
+            if self.translateY_cb.isChecked() and self.translateZ_cb.isChecked():
+                # skips x
+                skipped_axes_rotate = [e for e in axes_type if e not in ('y', 'z')]
+                print(skipped_axes_rotate)
+            if self.translateZ_cb.isChecked() and self.translateX_cb.isChecked():
+                # skips y
+                skipped_axes_rotate = [e for e in axes_type if e not in ('x', 'z')]
+                print(skipped_axes_rotate)
+
+            if self.translateX_cb.isChecked() and self.translateY_cb.isChecked() and self.translateZ_cb.isChecked():
+                # skips y
+                skipped_axes_rotate = "none"
+                print(skipped_axes_rotate)
+        else:
+            skipped_axes_rotate = axes_type
+
+        return skipped_axes_translate, skipped_axes_rotate
+
+    def create_parent_constraint(self, source, target, skipped_axes_translate, skipped_axes_rotate):
         if self.maintainOffset_cb.isChecked():
 
-            pm.parentConstraint(source, target, st=skipped_axes, sr=skipped_axes, mo=1)
+            pm.parentConstraint(source, target, st=skipped_axes_translate, sr=skipped_axes_rotate, mo=1)
         else:
-            pm.parentConstraint(source, target, st=skipped_axes, sr=skipped_axes, mo=0)
+            pm.parentConstraint(source, target, st=skipped_axes_translate, sr=skipped_axes_rotate, mo=0)
 
     def create_point_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
