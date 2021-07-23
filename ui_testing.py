@@ -4,6 +4,7 @@ from PySide2 import QtWidgets
 from shiboken2 import wrapInstance
 
 import maya.OpenMayaUI as omui
+import maya.OpenMaya as om
 import pymel.core as pm
 
 
@@ -26,8 +27,8 @@ class TestDialogue(QtWidgets.QDialog):
         self.create_connections()
 
     def create_widgets(self):
-        self.matrix_rb = QtWidgets.QRadioButton("matrix")
-        self.default_rb = QtWidgets.QRadioButton("default")
+        self.matrix_cb = QtWidgets.QCheckBox("matrix")
+        self.default_cb = QtWidgets.QCheckBox("default")
 
         self.prntConst_rb = QtWidgets.QRadioButton("Parent")
         self.prntConst_rb.setIcon(QtGui.QIcon(":parentConstraint.png"))
@@ -81,8 +82,8 @@ class TestDialogue(QtWidgets.QDialog):
 
         # layout for constraint method
         box_layout_type = QtWidgets.QHBoxLayout()
-        box_layout_type.addWidget(self.default_rb)
-        box_layout_type.addWidget(self.matrix_rb)
+        box_layout_type.addWidget(self.default_cb)
+        box_layout_type.addWidget(self.matrix_cb)
 
         # layout for translate checkbox
         box_translate = QtWidgets.QHBoxLayout()
@@ -143,21 +144,29 @@ class TestDialogue(QtWidgets.QDialog):
         sel = pm.ls(sl=1)
         source = sel[0]
         target = sel[1]
+        print source
+        print target
 
-        if self.prntConst_rb.isChecked():
-            skipped_axes_translate, skipped_axes_rotate = self.check_parentConstraint_axes()
+        if self.default_cb.isChecked():
 
-            self.create_parent_constraint(source, target, skipped_axes_translate, skipped_axes_rotate)
-        elif self.pntConst_rb.isChecked():
-            skipped_axes = self.check_axes()
-            self.create_point_constraint(source, target, skipped_axes)
-        elif self.orntConst_rb.isChecked():
-            skipped_axes = self.check_axes()
-            self.create_orient_constraint(source, target, skipped_axes)
+            if self.prntConst_rb.isChecked():
+                skipped_axes_translate, skipped_axes_rotate = self.check_parentConstraint_axes()
+
+                self.create_parent_constraint(source, target, skipped_axes_translate, skipped_axes_rotate)
+            elif self.pntConst_rb.isChecked():
+                skipped_axes = self.check_axes()
+                self.create_point_constraint(source, target, skipped_axes)
+            elif self.orntConst_rb.isChecked():
+                skipped_axes = self.check_axes()
+                self.create_orient_constraint(source, target, skipped_axes)
+            else:
+                skipped_axes = self.check_axes()
+                self.create_scale_constraint(source, target, skipped_axes)
         else:
-            skipped_axes = self.check_axes()
-            self.create_scale_constraint(source, target, skipped_axes)
+            skipped_axes_translate, skipped_axes_rotate = self.check_parentConstraint_axes()
+            self.create_matrix_constraint(source, target, skipped_axes_translate, skipped_axes_rotate)
 
+    # querying checked axes for orient and scale constraint
     def check_axes(self):
         axes_type = ["x", "y", "z"]
         skipped_axes = []
@@ -196,6 +205,7 @@ class TestDialogue(QtWidgets.QDialog):
             print(skipped_axes)
         return skipped_axes
 
+    # querying checked axes for parent constraint
     def check_parentConstraint_axes(self):
 
         axes_type = ["x", "y", "z"]
@@ -283,19 +293,70 @@ class TestDialogue(QtWidgets.QDialog):
         else:
             pm.parentConstraint(source, target, st=skipped_axes_translate, sr=skipped_axes_rotate, mo=0)
 
+    # create point constraint
     def create_point_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
             pm.pointConstraint(source, target, sk=skipped_axes, mo=1)
         else:
             pm.pointConstraint(source, target, sk=skipped_axes, mo=0)
 
+    # create orient constraint
     def create_orient_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
             pm.orientConstraint(source, target, sk=skipped_axes, mo=1)
         else:
             pm.orientConstraint(source, target, sk=skipped_axes, mo=0)
 
+    # create scale constraint
     def create_scale_constraint(self, source, target, skipped_axes):
+        if self.maintainOffset_cb.isChecked():
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=1)
+        else:
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=0)
+
+    # matrix
+    def create_matrix_constraint(self, source, target, skipped_axes_translate, skipped_axes_rotate):
+        """target_local_matrix = om.MMatrix(pm.xform(target,q=True,m = True, ws = False))
+        target_offset_matrix = om.MMatrix(pm.getAttr(target + ".offsetParentMatrix"))"""
+        source_offset_matrix = om.MMatrix(pm.getAttr("{}.{}".format(source, "offsetParentMatrix")))
+        source_local_matrix = om.MMatrix(pm.xform(source, q=True, m=True, ws=False))
+
+        # zeroout transform by multplying local matrix to offset matrix
+        """target_baked_matrix = target_local_matrix * target_offset_matrix"""
+        source_baked_matrix = source_local_matrix * source_offset_matrix
+
+        """pm.setAttr(target + ".offsetParentMatrix", target_baked_matrix, type="matrix")"""
+        pm.setAttr(source + ".offsetParentMatrix", source_baked_matrix, type="matrix")
+
+        mult_matrix = pm.shadingNode("multMatrix", asUtility=True)
+
+        target_parent = pm.listRelatives(target, p=1)
+        pm.connectAttr("{}.{}".format(source, "worldMatrix[0]"), "{}.{}".format(mult_matrix, "matrixIn[0]"), f=1)
+        pm.connectAttr("{}.{}".format(target_parent, "parentInverseMatrix[0]"),
+                       "{}.{}".format(mult_matrix, "matrixIn[1]"), f=1)
+        pm.connectAttr("{}.{}".format(mult_matrix, "matrixSum"),
+                       "{}.{}".format(target, "offsetParentMatrix"), f=1)
+
+    def create_matrix_scale_constraint(self, source, target, skipped_axes):
+        if self.maintainOffset_cb.isChecked():
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=1)
+        else:
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=0)
+
+    def create_matrix_point_constraint(self, source, target, skipped_axes):
+        if self.maintainOffset_cb.isChecked():
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=1)
+        else:
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=0)
+
+    def create_matrix_parent_constraint(self, source, target, skipped_axes):
+        if self.maintainOffset_cb.isChecked():
+            return
+
+        else:
+            pm.scaleConstraint(source, target, sk=skipped_axes, mo=0)
+
+    def create_matrix_orient_constraint(self, source, target, skipped_axes):
         if self.maintainOffset_cb.isChecked():
             pm.scaleConstraint(source, target, sk=skipped_axes, mo=1)
         else:

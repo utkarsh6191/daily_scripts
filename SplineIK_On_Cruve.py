@@ -47,7 +47,7 @@ class TestDialogue(QtWidgets.QDialog):
         self.number_sp = QtWidgets.QSpinBox()
         self.control_label = QtWidgets.QLabel("Control")
         self.number_sp.setFixedWidth(50)
-        self.number_sp.setValue(9)
+        self.number_sp.setValue(15)
         self.number_sp.setButtonSymbols(QtWidgets.QAbstractSpinBox.NoButtons)
 
         # radio buttons
@@ -123,32 +123,21 @@ class TestDialogue(QtWidgets.QDialog):
         self.cancel_btn.clicked.connect(self.close)
 
     def spline_ik_chain(self):
-        """if (pm.selectPref(tso=True, q=True) == 0):
-            pm.selectPref(tso=True)
-        print(pm.ls(orderedSelection=True))"""
-
         # select curve
         sel = pm.ls(sl=1)
-
-        crv_list = []
-        name = self.name_field.text()
         if len(sel) > 1:
             i = 1
             for s in sel:
-                print s
-                crv = pm.rebuildCurve(s[0], ch=0, rpo=1, rt=0, end=1, kr=0, kcp=1, kep=1, kt=0, s=9, d=3,
+                crv = pm.rebuildCurve(s, ch=0, rpo=1, rt=0, end=1, kr=0, kcp=1, kep=1, kt=0, s=9, d=3,
                                       tol=0.01)
-                print crv
-                crv_list.append(crv)
-            print crv_list
-            for crv in crv_list:
-                name = "{}_{}".format(name, i)
-                self.create_spline_chain(crv)
-                i += 1
+                counter = i
+                self.create_spline_chain(crv, counter)
+                i = i + 1
         else:
+            counter = 1
             crv = pm.rebuildCurve(sel[0], ch=0, rpo=1, rt=0, end=1, kr=0, kcp=1, kep=1, kt=0, s=9, d=3,
                                   tol=0.01)
-            self.create_spline_chain(crv)
+            self.create_spline_chain(crv, counter)
         if self.stretch_cb.isChecked():
             print("stretch checked")
 
@@ -162,8 +151,11 @@ class TestDialogue(QtWidgets.QDialog):
     def createOffset(self, target, suffix):
 
         pm.select(clear=1)
-        ctrl_parent = pm.listRelatives(target, p=1)
-        offset_grp = pm.group(target, n=target[0] + suffix)
+        # assuming last naming convention is like name_C_001_TYPE (Leg_C_001_CTRL)
+        offset_name = str(target).split('_')
+        offset_name[-1] = suffix
+        offset_name_joined = '_'.join(offset_name)
+        offset_grp = pm.group(target, n=offset_name_joined)
         pm.xform(offset_grp, cp=1)
 
         return offset_grp
@@ -210,16 +202,13 @@ class TestDialogue(QtWidgets.QDialog):
         # control for controlling animation of joints on curve
         # curve
         crv = crv[0]
-
         # joint lists
-        jntList = []
+        jnt_list = []
 
         uVal = 1.0 / (segments)
 
-        # wordUp object
-        upObj_loc = pm.spaceLocator(n="worldUpObject_LOCT")
         pm.select(clear=1)
-        i = 0
+        i = 1
 
         motionpath_front_axis = 1
         # set front axis
@@ -231,16 +220,13 @@ class TestDialogue(QtWidgets.QDialog):
             motionpath_front_axis = 3  # z
 
         # attach joints to curve
-        # using numpy to distribute tphe number evenly between 0 to 1
+        # using numpy to distribute the number evenly between 0 to 1
         uval_list = np.linspace(0, 1, segments)
 
         mpath_node_list = []
         for i in range(segments):
-            jnt = pm.joint()
-            jntList.append(jnt)
-
-            jnt_name = name + '_ctrl' + '_C_' + '{:03}'.format(i) + '_JOIN'
-            pm.rename(jnt, jnt_name)
+            jnt = pm.joint(n=name + '_ctrl' + '_C_' + '{:03}'.format(i) + '_JOIN', rad=0.02)
+            jnt_list.append(jnt)
             pm.select(clear=1)
 
             # create motion path node
@@ -251,7 +237,7 @@ class TestDialogue(QtWidgets.QDialog):
 
             # set worldobject to stop fliping
             pm.setAttr(mPath_node + ".worldUpType", 1)
-            pm.connectAttr(upObj_loc + ".worldMatrix[0]", mPath_node + ".worldUpMatrix")
+            # pm.connectAttr(upObj_loc + ".worldMatrix[0]", mPath_node + ".worldUpMatrix")
 
             # connect joint to curve using motion path
             pm.connectAttr(crv + ".worldSpace[0]", mPath_node + ".geometryPath", f=0)
@@ -269,25 +255,22 @@ class TestDialogue(QtWidgets.QDialog):
             pm.delete(mPath_node)
 
             i = i + 1
-        return jntList
+        return jnt_list
 
     def create_joint_on_cvs(self, sel, heirarchy=True):
 
         curve_cvs = pm.ls('{0}.cv[:]'.format(sel[0]), fl=True)
         jnt_list = []
         jnt_pos_list = []
-
-        print curve_cvs
         name = self.name_field.text()
-        i = 0
+
+        # create joint on cv positions
+        i = 1
         for cv in curve_cvs:
             # get position of vertex
             pos = pm.xform(cv, ws=1, q=1, t=1)
             # create joint
-            jnt = pm.joint(p=pos, rad=0.02)
-
-            jnt_name = name + '_C_' + '{:03}'.format(i) + '_JOIN'
-            pm.rename(jnt, jnt_name)
+            jnt = pm.joint(n=name + '_C_' + '{:03}'.format(i) + '_JOIN', p=pos, rad=0.02)
             pm.parent(jnt, w=1)
 
             jnt_pos_list.append(pos)
@@ -303,17 +286,16 @@ class TestDialogue(QtWidgets.QDialog):
 
         return [jnt_list, jnt_pos_list]
 
-    def create_spline_chain(self, sel, name=None):
+    def create_spline_chain(self, sel, counter):
 
         # clear selection to avoid parenting
         pm.select(clear=1)
         # name field output
 
         control_count = self.number_sp.value()
-        if name is None:
-            name = self.name_field.text()
-        else:
-            name = name
+
+        name = self.name_field.text() + str(counter)
+
         # control field output
         segments = self.number_sp.value()
 
@@ -322,21 +304,17 @@ class TestDialogue(QtWidgets.QDialog):
             rig_grup = pm.group(n="rig_C_001_GRUP")
 
         if not pm.objExists("bodyDeform_C_001_GRUP"):
-            bodyDef_grup = pm.group(n="bodyDeform_C_001_GRUP")
+            body_def_group = pm.group(n="bodyDeform_C_001_GRUP")
 
         rig_grup = "rig_C_001_GRUP"
-        bodyDef_grup = "bodyDeform_C_001_GRUP"
-
-        jntList = []
-        jntPosList = []
-        bodydeform_obj = []
+        body_def_group = "bodyDeform_C_001_GRUP"
 
         jnt_return_list = self.create_joint_on_cvs(sel)
         jnt_list = jnt_return_list[0]
         jnt_pos_list = jnt_return_list[1]
 
         # orient chain
-        pm.joint(jnt_list[0], e=1, oj="xyz", ch=1)
+        pm.joint(jnt_list[0], e=1, oj="xyz", secondaryAxisOrient="yup", ch=1)
         pm.joint(jnt_list[-1], e=1, oj="none")
 
         # rebuilt curve
@@ -348,13 +326,18 @@ class TestDialogue(QtWidgets.QDialog):
         pm.select(cl=1)
         ctrl_jnts = self.create_joint_on_curve(name, crv, control_count)
 
+        for c in ctrl_jnts:
+            pm.setAttr("{}.{}".format(c, "rotateX"), 0)
+            pm.setAttr("{}.{}".format(c, "rotateY"), 0)
+            pm.setAttr("{}.{}".format(c, "rotateZ"), 0)
+
         # create splineIK handle
         i = 1
         pm.select(clear=1)
-        ikHdl = pm.ikHandle(n='ikh', sj='{}'.format(jnt_list[0]), ee='{}'.format(jnt_list[-1]), sol='ikSplineSolver',
-                            ccv=False, pcv=False, c=crv[0])[0]
-        print ikHdl
-        pm.rename(ikHdl, name + '_C_' + '{:03}'.format(i) + '_KHDL')
+
+        ik_hdl = pm.ikHandle(n='ikh', sj='{}'.format(jnt_list[0]), ee='{}'.format(jnt_list[-1]), sol='ikSplineSolver',
+                             ccv=False, pcv=False, c=crv[0])[0]
+        pm.rename(ik_hdl, name + '_C_' + '{:03}'.format(i) + '_KHDL')
 
         pm.select(ctrl_jnts, crv)
         pm.skinCluster(ctrl_jnts, crv, tsb=1)
@@ -367,19 +350,20 @@ class TestDialogue(QtWidgets.QDialog):
         follow_list = []
         offset_grp_list = []
         pm.select(clear=1)
-        i = 0
+        i = 1
         # create controls with offset group
         for c in ctrl_jnts:
-            ctrl = pm.circle(n=name + 'ik_C_' + '{:03}'.format(i) + '_CTRL', c=(0, 0, 0), nr=(1, 0, 0), sw=360, r=1,
-                             d=1,
-                             ut=0, tol=0.01, s=4, ch=0)
-            fk_ctrl = pm.circle(n=name + 'fk_C_' + '{:03}'.format(i) + '_CTRL', c=(0, 0, 0), nr=(1, 0, 0), sw=360, r=1,
-                                d=3, ut=0, tol=0.01, s=8, ch=0)
+            ctrl = pm.circle(n=name + '_ik_C_' + '{:03}'.format(i) + '_CTRL', c=(0, 0, 0), nr=(1, 0, 0), sw=360, r=0.2,
+                             d=1, ut=0, tol=0.01, s=4, ch=0)
 
-            fk_ctrl_offset = self.createOffset(fk_ctrl, '_C_' + '{:03}'.format(i) + '_GRUP')
-            offset_grp = self.createOffset(ctrl, '_C_' + '{:03}'.format(i) + '_GRUP')
-            follow_grp = self.createOffset(ctrl, '_follow_C_' + '{:03}'.format(i) + '_GRUP')
-            aim_grp = self.createOffset(ctrl, '_aim_C_' + '{:03}'.format(i) + '_GRUP')
+            pm.setAttr("{}.{}".format(ctrl[0], "rotateX"), 45)
+            pm.makeIdentity(ctrl, apply=True, t=1, r=1, s=1, n=0, pn=1)
+
+            fk_ctrl = pm.circle(n=name + '_fk_C_' + '{:03}'.format(i) + '_CTRL', c=(0, 0, 0), nr=(1, 0, 0), sw=360,
+                                r=0.1, d=3, ut=0, tol=0.01, s=8, ch=0)
+
+            fk_ctrl_offset = self.createOffset(fk_ctrl[0], 'GRUP')
+            offset_grp = self.createOffset(ctrl[0], 'GRUP')
 
             pm.delete(pm.parentConstraint(c, offset_grp))
             pm.delete(pm.parentConstraint(c, fk_ctrl_offset))
@@ -387,8 +371,6 @@ class TestDialogue(QtWidgets.QDialog):
 
             ctrl_list.append(ctrl)
             offset_grp_list.append(offset_grp)
-            aim_list.append(aim_grp)
-            follow_list.append(follow_grp)
             ctrl_fk_offset_list.append(fk_ctrl_offset)
             ctrl_fk_list.append(fk_ctrl)
             i = i + 1
@@ -398,128 +380,19 @@ class TestDialogue(QtWidgets.QDialog):
         for i in range(len(ctrl_jnts)):
             pm.parentConstraint(ctrl_list[i], ctrl_jnts[i], mo=1)
             i += 1
-
+        ctrl_fk_list.reverse()
+        ctrl_fk_offset_list.reverse()
         for i in range(len(ctrl_fk_list) - 1):
             pm.parent(ctrl_fk_offset_list[i], ctrl_fk_list[i + 1])
             i = i + 1
-        primary_controls = []
-        secondary_controls = []
-        tertiary_controls = []
-        """if segments > 2:
-            middle_control = segments / 2
-            primary_controls = ctrl_list[0::4]
-            secondary_controls = ctrl_list[2::4]
-            tertiary_controls = ctrl_list[0::2]
 
-            print primary_controls
-            print secondary_controls
-            print tertiary_controls
-            print ctrl_list"""
+        spline_deform_grup = self.createOffset(jnt_list[0], "GRUP")
 
-        """if self.connected_cb.isChecked():
-            pm.pointConstraint(ctrl_list[0], ctrl_list[-1], follow_list[4], mo=1)
-            pm.pointConstraint(ctrl_list[0], ctrl_list[4], follow_list[2], mo=1)
-            pm.pointConstraint(ctrl_list[4], ctrl_list[-1], follow_list[6], mo=1)
-
-            pm.pointConstraint(ctrl_list[0], ctrl_list[2], follow_list[1], mo=1)
-            pm.pointConstraint(ctrl_list[2], ctrl_list[4], follow_list[3], mo=1)
-            pm.pointConstraint(ctrl_list[4], ctrl_list[6], follow_list[5], mo=1)
-            pm.pointConstraint(ctrl_list[6], ctrl_list[8], follow_list[7], mo=1)
-
-            pm.aimConstraint(ctrl_list[4], aim_list[2], mo=1, weight=1, aimVector=[0, -1, 0], upVector=[0, 1, 0],
-                             worldUpType="objectrotation", worldUpVector=[0, 1, 0], worldUpObject=str(ctrl_list[0][0]))
-            pm.aimConstraint(ctrl_list[4], aim_list[6], mo=1, weight=1, aimVector=[0, 1, 0], upVector=[0, 1, 0],
-                             worldUpType="objectrotation", worldUpVector=[0, 1, 0], worldUpObject=str(ctrl_list[-1][0]))
-
-            pm.aimConstraint(ctrl_list[2], aim_list[1], mo=1, weight=1, aimVector=[0, -1, 0], upVector=[0, 1, 0],
-                             worldUpType="objectrotation", worldUpVector=[0, 1, 0], worldUpObject=str(ctrl_list[0][0]))
-            pm.aimConstraint(ctrl_list[2], aim_list[3], mo=1, weight=1, aimVector=[0, -1, 0], upVector=[0, 1, 0],
-                             worldUpType="objectrotation", worldUpVector=[0, 1, 0], worldUpObject=str(ctrl_list[4][0]))
-            pm.aimConstraint(ctrl_list[6], aim_list[5], mo=1, weight=1, aimVector=[0, 1, 0], upVector=[0, 1, 0],
-                             worldUpType="objectrotation", worldUpVector=[0, 1, 0], worldUpObject=str(ctrl_list[4][0]))
-            pm.aimConstraint(ctrl_list[6], aim_list[7], mo=1, weight=1, aimVector=[0, 1, 0], upVector=[0, 1, 0],
-                             worldUpType="objectrotation", worldUpVector=[0, 1, 0], worldUpObject=str(ctrl_list[-1][0]))"""
-
-        root_ctrl = pm.group(n=name + '_C_001_CTRL', c=(0, 0, 0), nr=(0, 1, 0), sw=360, r=1, d=3, ut=0, tol=0.01,
-                             s=8, ch=0)
-        root_ctrl_grup = self.createOffset(root_ctrl, "_offset")
-
-        """# create sine deformer
-        if self.sine_cb.isChecked():
-            # create sine deformer
-            sineCrv = pm.duplicate(sel[0])
-            pm.rename(sineCrv, 'sineCrv')
-
-            pm.select(sineCrv)
-
-            sineDef = pm.nonLinear(type='sine')
-
-            # add attributes to control
-            pm.addAttr(root_ctrl, ln="sine", at="enum", en="control:", k=1)
-            pm.addAttr(root_ctrl, ln="sineSwitch", at="bool", k=1)
-            pm.addAttr(root_ctrl, ln="sineAmplitude", at="double", dv=0, k=1)
-            pm.addAttr(root_ctrl, ln="sineWaveLength", at="double", dv=2, k=1)
-            pm.addAttr(root_ctrl, ln="sineHighBound", at="double", min=0, max=10, dv=1, k=1)
-            pm.addAttr(root_ctrl, ln="sineLowBound", at="double", min=-10, max=0, dv=-1, k=1)
-            pm.addAttr(root_ctrl, ln="sineDropOff", at="double", min=-1, max=1, dv=0, k=1)
-
-            # create blendshape
-            # bshp = pm.blendShape(sineCrv, waveCrv, splineIkCrv)
-            bshp = pm.blendShape(sineCrv, sel[0])
-
-            # connect atrribute to deformer
-            pm.connectAttr(str(root_ctrl[0]) + ".sineSwitch", bshp[0] + ".sineCrv")
-
-            pm.connectAttr(str(root_ctrl[0]) + '.sineAmplitude', str(sineDef[0]) + '.amplitude')
-            pm.connectAttr(str(root_ctrl[0]) + '.sineHighBound', str(sineDef[0]) + '.highBound')
-            pm.connectAttr(str(root_ctrl[0]) + '.sineLowBound', str(sineDef[0]) + '.lowBound')
-            pm.connectAttr(str(root_ctrl[0]) + '.sineWaveLength', str(sineDef[0]) + '.wavelength')
-            pm.connectAttr(str(root_ctrl[0]) + '.sineSwitch', str(sineDef[0]) + '.offset')
-
-            bodydeform_obj.append(sineDef)
-            bodydeform_obj.append(sineCrv)
-
-        # create wave deformer
-        if self.wave_cb.isChecked():
-            # create wave deformer
-            waveCrv = pm.duplicate(splineIkCrv)
-            pm.rename(waveCrv, 'waveCrv')
-            pm.select(waveCrv)
-
-            waveDef = pm.nonLinear(type="wave")
-
-            pm.addAttr(root_ctrl, ln="wave", at="enum", en="control:", k=1)
-            pm.addAttr(root_ctrl, ln="waveSwitch", at="bool", k=1)
-            pm.addAttr(root_ctrl, ln="waveAmplitude", at="double", dv=0, k=1)
-            pm.addAttr(root_ctrl, ln="waveWaveLength", at="double", dv=2, k=1)
-            pm.addAttr(root_ctrl, ln="waveOffset", at="double", min=-10, max=10, dv=0, k=1)
-            pm.addAttr(root_ctrl, ln="waveDropOffPosition", at="double", min=-1, max=1, dv=0, k=1)
-            pm.addAttr(root_ctrl, ln="waveMinRadius", at="double", min=0, max=10, dv=0, k=1)
-            pm.addAttr(root_ctrl, ln="waveMaxRadius", at="double", min=0, max=10, dv=0, k=1)
-
-            bshp = pm.blendShape(waveCrv, splineIkCrv)
-
-            pm.connectAttr(str(root_ctrl[0]) + ".waveSwitch", bshp[0] + ".waveCrv")
-            pm.connectAttr(str(root_ctrl[0]) + '.waveAmplitude', str(waveDef[0]) + '.amplitude')
-            pm.connectAttr(str(root_ctrl[0]) + '.waveDropOffPosition', str(waveDef[0]) + '.dropoffPosition')
-            pm.connectAttr(str(root_ctrl[0]) + '.waveMaxRadius', str(waveDef[0]) + '.maxRadius')
-            pm.connectAttr(str(root_ctrl[0]) + '.waveMinRadius', str(waveDef[0]) + '.minRadius')
-            pm.connectAttr(str(root_ctrl[0]) + '.waveOffset', str(waveDef[0]) + '.offset')
-            pm.connectAttr(str(root_ctrl[0]) + '.waveWaveLength', str(waveDef[0]) + '.wavelength')
-
-            bodydeform_obj.append(waveCrv)
-            bodydeform_obj.append(waveDef)
-
-        pm.parent(offset_grp_list, root_ctrl[0])
-        bodydeform_obj.append(jntList[0])
-        bodydeform_obj.append(ctrlJnts)
-        bodydeform_obj.append(ikHdl)
-        bodydeform_obj.append(splineIkCrv)"""
-
-        pm.parent(bodydeform_obj, bodyDef_grup)
-
-        pm.parent(bodyDef_grup, rig_grup)
-        pm.parent(root_ctrl_grup, rig_grup)
+        # pm.parent(jnt_list, spline_deform_grup)
+        pm.parent(ik_hdl, spline_deform_grup)
+        pm.parent(ctrl_jnts, spline_deform_grup)
+        pm.parent(crv, spline_deform_grup)
+        pm.parent(spline_deform_grup, body_def_group)
 
 
 if __name__ == "__main__":
