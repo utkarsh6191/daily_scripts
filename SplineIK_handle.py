@@ -10,11 +10,9 @@ from shiboken2 import wrapInstance
 
 import numpy as np
 
-
 def maya_main_window():
     maya_window_ptr = omui.MQtUtil.mainWindow()
     return wrapInstance(long(maya_window_ptr), QtWidgets.QWidget)
-
 
 """class MyLineEdit(QtWidgets.QLineEdit):
     enter_pressed = QtCore.Signal(str)
@@ -126,20 +124,18 @@ class TestDialogue(QtWidgets.QDialog):
         self.cancel_btn.clicked.connect(self.close)
 
     def spline_ik_chain(self):
-        if (pm.selectPref(tso=True, q=True) == 0):
+        """if (pm.selectPref(tso=True, q=True) == 0):
             pm.selectPref(tso=True)
-        print(pm.ls(orderedSelection=True))
+        print(pm.ls(orderedSelection=True))"""
 
-        sel = pm.ls(sl=1, fl=1)
-
+        # select curve
+        sel = pm.ls(sl=1)
         # pm.polySelectConstraint(dis =1)
-
-        print(sel)
 
         name = self.chain_name()
         count = self.control_count()
 
-        # self.create_spline_chain(sel)
+        self.create_spline_chain(sel)
         if self.stretch_cb.isChecked():
             print("stretch checked")
 
@@ -161,7 +157,6 @@ class TestDialogue(QtWidgets.QDialog):
 
     def snap(self, obj, target):
         prntConst = pm.parentConstraint(target, obj, mo=0)
-
         pm.delete(prntConst)
 
     def getUParam(self, pnt=[], crv=None):

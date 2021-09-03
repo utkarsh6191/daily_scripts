@@ -382,6 +382,7 @@ class TestDialogue(QtWidgets.QDialog):
             i += 1
         ctrl_fk_list.reverse()
         ctrl_fk_offset_list.reverse()
+
         for i in range(len(ctrl_fk_list) - 1):
             pm.parent(ctrl_fk_offset_list[i], ctrl_fk_list[i + 1])
             i = i + 1
